@@ -1,0 +1,1 @@
+window.DESIGN_PHOTOS={"230":"assets/gold/a670bc03d68648f84af6ad9a5c430ea12dfd27ae.png","245":"assets/gold/ecf7103d70cd4535fa55cff1547df28ee18d8225.png","251":"assets/gold/f6851ea3c7a0f3a1180db2ea14a863811f528473.png"};
