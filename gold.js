@@ -54,15 +54,23 @@
       });
     }else motion.classList.add('enter');
   });
+  // Use the actual viewport for entrance motion. Several mobile WebViews fail to
+  // deliver IntersectionObserver events for transformed SVG <g> elements.
+  const pendingEntries=new Set($$('.enter'));let revealRaf=false;
+  function revealInViewport(){
+    revealRaf=false;const trigger=innerHeight*.92;
+    pendingEntries.forEach(el=>{
+      const anchor=el.closest('[role="img"]')||el,rect=anchor.getBoundingClientRect();
+      if(rect.bottom>=-24&&rect.top<=trigger){el.classList.add('visible');pendingEntries.delete(el);}
+    });
+  }
+  function requestReveal(){if(!revealRaf&&pendingEntries.size){revealRaf=true;requestAnimationFrame(revealInViewport);}}
+  document.documentElement.classList.add('motion-ready');
+  addEventListener('scroll',requestReveal,{passive:true});addEventListener('resize',requestReveal);addEventListener('load',requestReveal);
+  requestReveal();
   if('IntersectionObserver' in window){
-    const entryObserver=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');entryObserver.unobserve(e.target);}}),{rootMargin:'0px 0px 25px 0px',threshold:0});
-    $$('.enter').forEach(el=>entryObserver.observe(el));
     const loopObserver=new IntersectionObserver(entries=>entries.forEach(e=>e.target.classList.toggle('offscreen',!e.isIntersecting)),{rootMargin:'80px'});
     $$('.loop').forEach(el=>loopObserver.observe(el));
-    document.documentElement.classList.add('motion-ready');
-    // Some mobile WebViews do not report SVG <g> intersections reliably.
-    // Keep the reveal animation, but guarantee that text never remains hidden.
-    setTimeout(()=>$$('.enter').forEach(el=>el.classList.add('visible')),1400);
   }
   const backlight=$('#motion-199');let rafPending=false;
   function updateLight(){rafPending=false;if(reduce.matches){backlight.style.setProperty('--light',1);return;}const bounds=$('#node-199').getBoundingClientRect();const progress=Math.min(1,Math.max(0,(innerHeight*.9-bounds.top)/(innerHeight*.7)));backlight.style.setProperty('--light',(.16+.84*progress).toFixed(3));}
