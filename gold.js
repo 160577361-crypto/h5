@@ -63,26 +63,33 @@
   });
   // Use the actual viewport for entrance motion. Several mobile WebViews fail to
   // deliver IntersectionObserver events for transformed SVG <g> elements.
-  const pendingEntries=new Set($$('.enter'));let revealRaf=false;
+  const pendingEntries=new Set($$('.enter'));let revealRaf=false,motionPainted=false;
   function revealInViewport(){
     revealRaf=false;const trigger=innerHeight*.92;
     pendingEntries.forEach(el=>{
       const anchor=el.closest('[role="img"]')||el,rect=anchor.getBoundingClientRect();
-      if(rect.bottom>=-24&&rect.top<=trigger){el.classList.add('visible');pendingEntries.delete(el);}
+      // Reveal anything the user has reached, even if a fast swipe jumps past
+      // the element between two scroll events.
+      if(rect.top<=trigger){el.classList.add('visible');pendingEntries.delete(el);}
     });
   }
-  function requestReveal(){if(!revealRaf&&pendingEntries.size){revealRaf=true;requestAnimationFrame(revealInViewport);}}
+  function requestReveal(){if(motionPainted&&!revealRaf&&pendingEntries.size){revealRaf=true;requestAnimationFrame(revealInViewport);}}
   document.documentElement.classList.add('motion-ready');
   addEventListener('scroll',requestReveal,{passive:true});addEventListener('resize',requestReveal);addEventListener('load',requestReveal);
-  requestReveal();
-  if('IntersectionObserver' in window){
-    const loopObserver=new IntersectionObserver(entries=>entries.forEach(e=>e.target.classList.toggle('offscreen',!e.isIntersecting)),{rootMargin:'80px'});
-    $$('.loop').forEach(el=>loopObserver.observe(el));
-  }
-  const backlight=$('#motion-199');let rafPending=false;
-  function updateLight(){rafPending=false;if(reduce.matches){backlight.style.setProperty('--light',1);return;}const bounds=$('#node-199').getBoundingClientRect();const progress=Math.min(1,Math.max(0,(innerHeight*.9-bounds.top)/(innerHeight*.7)));backlight.style.setProperty('--light',(.16+.84*progress).toFixed(3));}
+  // Let the hidden entrance state paint once before revealing the first screen.
+  // Without this delay, mobile WebViews often collapse both states into one frame.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{motionPainted=true;revealInViewport();}));
+  // Several mobile WebViews report unreliable IntersectionObserver results for
+  // transformed SVG groups. A cheap scroll check keeps looping motion alive.
+  const loops=$$('.loop');let loopRaf=false;
+  function updateLoops(){loopRaf=false;const margin=Math.max(180,innerHeight*.25);loops.forEach(el=>{const rect=(el.parentElement||el).getBoundingClientRect();const measurable=Number.isFinite(rect.top)&&Number.isFinite(rect.bottom);el.classList.toggle('offscreen',measurable&&(rect.bottom< -margin||rect.top>innerHeight+margin));});}
+  function requestLoops(){if(!loopRaf){loopRaf=true;requestAnimationFrame(updateLoops);}}
+  if(loops.length){addEventListener('scroll',requestLoops,{passive:true});addEventListener('resize',requestLoops);addEventListener('load',requestLoops);requestLoops();}
+  const backlight=$('#motion-199'),backlightBase=backlight?.querySelector('.backlight-base'),backlightNode=$('#node-199');let rafPending=false;
+  function updateLight(){rafPending=false;if(!backlight||!backlightNode)return;const bounds=backlightNode.getBoundingClientRect();const progress=reduce.matches?1:Math.min(1,Math.max(0,(innerHeight*.9-bounds.top)/(innerHeight*.68)));backlight.style.setProperty('--light',(.22+1.02*progress).toFixed(3));backlight.style.setProperty('--saturation',(.72+.48*progress).toFixed(3));if(backlightBase)backlightBase.style.opacity=(.3+.7*progress).toFixed(3);}
   function requestLight(){if(!rafPending){rafPending=true;requestAnimationFrame(updateLight);}}
-  addEventListener('scroll',requestLight,{passive:true});addEventListener('resize',requestLight);reduce.addEventListener('change',requestLight);updateLight();
+  addEventListener('scroll',requestLight,{passive:true});addEventListener('resize',requestLight);updateLight();
+  if(reduce.addEventListener)reduce.addEventListener('change',requestLight);else if(reduce.addListener)reduce.addListener(requestLight);
   let toastTimer;
   function toast(message){$('.toast').textContent=message;$('.toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('.toast').classList.remove('show'),3500);}
   let focusBefore,overflowBefore;
