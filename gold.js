@@ -1,7 +1,14 @@
 (() => {
   'use strict';
   const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-  const config=window.INVITATION||{},reduce=matchMedia('(prefers-reduced-motion: reduce)');
+  const config=window.INVITATION||{},reduce=matchMedia('(prefers-reduced-motion: reduce)'),liteMode=document.documentElement.classList.contains('lite');
+  const pendingImages=new Set($$('#design image[data-src]'));let imageRaf=false;
+  function loadNearbyImages(){
+    imageRaf=false;const margin=Math.max(700,innerHeight);
+    pendingImages.forEach(image=>{const rect=(image.closest('[role="img"]')||image).getBoundingClientRect();if(rect.bottom>=-margin&&rect.top<=innerHeight+margin){image.setAttribute('href',image.dataset.src);image.removeAttribute('data-src');pendingImages.delete(image);}});
+  }
+  function requestImages(){if(!imageRaf&&pendingImages.size){imageRaf=true;requestAnimationFrame(loadNearbyImages);}}
+  if(pendingImages.size){addEventListener('scroll',requestImages,{passive:true});addEventListener('resize',requestImages);addEventListener('load',requestImages);requestImages();}
   // Zoom a new inner group, keeping the exported image matrix and clip intact.
   [[230,291,213],[245,246,214],[251,252,213]].forEach(([photoId,arrowId,height])=>{
     const card=$('#node-'+photoId),arrow=$('#node-'+arrowId),image=card?.querySelector('image');
@@ -113,5 +120,9 @@
   audio.addEventListener('play',syncAudio);audio.addEventListener('pause',syncAudio);audio.addEventListener('error',()=>{syncAudio();toast('背景音乐加载失败，请点击音乐按钮重试');});
   document.addEventListener('visibilitychange',()=>{document.documentElement.classList.toggle('page-hidden',document.hidden);if(document.hidden){resumeWhenVisible=!audio.paused;audio.pause();}else if(resumeWhenVisible||needsGesture){resumeWhenVisible=false;playMusic();}});
   document.addEventListener('WeixinJSBridgeReady',playMusic,{once:true});
-  syncAudio();playMusic();
+  syncAudio();
+  if(liteMode){
+    const startMusic=()=>{'requestIdleCallback' in window?requestIdleCallback(playMusic,{timeout:2800}):setTimeout(playMusic,1800);};
+    document.readyState==='complete'?startMusic():addEventListener('load',startMusic,{once:true});
+  }else playMusic();
 })();
